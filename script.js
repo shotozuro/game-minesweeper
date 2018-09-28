@@ -19,130 +19,162 @@ More features:
 
 let board = []
 let bombLocation = []
+
 let boardLength = 0
 let bombsLength = 0
+let isGameOver = false
 
 const boardEl = document.getElementById("board")
 const inputBoard = document.getElementById("boardLength")
 const inputBombs = document.getElementById("bombsLength")
 const gameStatus = document.getElementById("status")
+const statusEl = document.getElementById("status")
 
-document.getElementById("setBoard").addEventListener("click", setBoardLength)
-document.getElementById("setBomb").addEventListener("click", setBombs)
+const inputBoardBtn = document.getElementById("setBoard")
+
+inputBoardBtn.addEventListener("click", setBoardLength)
+document.getElementById("resetGame").addEventListener("click", init)
 
 function setBoardLength () {
+  statusEl.innerText = ""
   const boardVal = parseInt(inputBoard.value)
-  // const bombVal = parseInt(inputBombs.value)
-  if (boardVal < 1) {
-    alert('Kotak minimal 1')
+  const bombVal = parseInt(inputBombs.value)
+  if (!boardVal || boardVal < 1) {
+    statusEl.innerText = "Minimum board length is 1"
   } else {
     board = Array(boardVal).fill(0).map(x => { return {value: 0, clicked: false} })
     boardLength = boardVal
-  }
-}
 
-function setBombs () {
-  const bombVal = parseInt(inputBombs.value)
-  let bombs = bombVal
-  const maxBombs = Math.ceil(boardLength * 1 / 3)
-  if (bombVal <= maxBombs) {
-    // random bomb and set to board
-    while(bombs > 0) {
-      const randomNumber = getRandom(boardLength)
-      console.log(randomNumber)
-      if (board[randomNumber].value == 0) {
-        board[randomNumber].value = "*"
-        bombLocation.push(randomNumber)
-        if (board[randomNumber - 1] && board[randomNumber - 1].hasOwnProperty('value')) {
-          if (board[randomNumber - 1].value != "*") {
-            board[randomNumber - 1].value += 1
-          }
-        }
-        if (board[randomNumber + 1] && board[randomNumber + 1].hasOwnProperty('value')) {
-          if (board[randomNumber + 1].value != "*") {
-            board[randomNumber + 1].value += 1
-          }
-        }
-        bombs--
-      }
+    const maxBombs = Math.ceil(boardLength * 1 / 3)
+    if (0 < bombVal && bombVal <= maxBombs) {
+      inputBoardBtn.disabled = true
+      bombsLength = bombVal
+      setBombs(bombVal)
+    } else {
+      statusEl.innerText = maxBombs != 1 ? "The bomb quantity should 1 up to " + maxBombs : "Only one bomb allowed"
+      // alert('Jumlah bomb minimal 1 dan maksimal ' + maxBombs)
     }
-    render()
-  } else {
-    alert('Jumlah bomb maksimal ' + maxBombs)
   }
 }
 
-function getRandom (count) {
-  return Math.floor(Math.random() * count) 
+function setBombs (quantity) {
+  let bombs = quantity
+  while(bombs > 0) {
+    const randomNumber = getRandom(boardLength)
+    if (board[randomNumber].value == 0) {
+      board[randomNumber].value = "*"
+      bombLocation.push(randomNumber)
+      const indexBefore = randomNumber - 1
+      const indexAfter = randomNumber + 1
+      
+      // left
+      if (isInBoard(indexBefore) && !isBomb(indexBefore)) {
+        board[indexBefore].value += 1
+      }
+
+      // right
+      if (isInBoard(indexAfter) && !isBomb(indexAfter)) {
+        board[indexAfter].value += 1
+      }
+      bombs--
+    }
+  }
+  console.log({bombs: bombLocation.join(", ")})
+  render()
+}
+
+function isInBoard (index) {
+  return 0 <= index && index < boardLength
+}
+
+function getRandom (maxNumber) {
+  return Math.floor(Math.random() * maxNumber) 
 }
 
 function render () {
   boardEl.innerHTML = ""
   for(let i = 0; i < boardLength; i++) {
     const div = document.createElement("button")
-    const text = document.createTextNode(board[i].value)
+    const { clicked: isClicked, value: boxValue } = board[i]
+    
     div.addEventListener("click", clickBox)
-    // div.appendChild(text)
-    div.disabled = board[i].clicked
+    if (isClicked) {
+      const text = document.createTextNode(boxValue)
+      div.appendChild(text)
+      div.disabled = isClicked
+    }
+    
     div.classList.add("box")
     div.setAttribute("id", "box-" + i)
-    // html += `<div class="box" id="box-${i}"></div>`
     boardEl.appendChild(div)
   }
   
 }
 
 function clickBox (e) {
-  const boxVal = e.target.id
-  const ids = boxVal.split("-")
-  const selectedBox = board[ids[1]]
+  // prevent player to play if the game is over
+  if (isGameOver) {
+    // alert("The game is over. Click Reset Game button to play again :)")
+    statusEl.innerText = "The game is over. Click Reset Game button to play again :)"
+    return
+  }
+
+  const ids = e.target.id.split("-")
+  const boxId = ids[1]
+  const selectedBox = board[boxId]
+  const { clicked: isClicked, value: boxValue } = selectedBox
   e.target.innerText = selectedBox.value
   selectedBox.clicked = true
-  if (selectedBox.value == "*") {
-    alert('game over')
+  // selectedElement = document.getElementById("box-" + boxId)
+  if (boxValue == "*") {
     gameOver()
-  } else if (selectedBox.value != 0 && selectedBox.value != "*") {
-    // open the box
-    // document.getElementById("box-" + ids[1]).innerText = selectedBox.value 
-    document.getElementById("box-" + ids[1]).innerText = selectedBox.value 
+  } else if (boxValue != 0) {
+    document.getElementById("box-" + boxId).innerText = boxValue
+    checkIsPlayerWin()
   } else {
-    // check before
-    let hasOpenedBefore = false
-    let hasOpenedAfter = false
-    let searchIdBefore = parseInt(ids[1]) - 1
-    let searchIdAfter = parseInt(ids[1]) + 1
-    while(!hasOpenedBefore) {
-      if (searchIdBefore > 0) {
-        if (board[searchIdBefore] && !isBomb(searchIdBefore)) {
-          board[searchIdBefore].clicked = true
-          if (board[searchIdBefore].value > 0) {
-            hasOpenedBefore = true
-          }
-        }
-        searchIdBefore --
-      } else {
-        hasOpenedBefore = true
-      }
-    }
-
-    while(!hasOpenedAfter) {
-      if (searchIdAfter < boardLength - 1) {
-        if (board[searchIdAfter] && !isBomb(searchIdAfter)) {
-          board[searchIdAfter].clicked = true
-          if (board[searchIdAfter].value > 0) {
-            hasOpenedAfter = true
-          }
-        }
-        searchIdAfter ++
-      } else {
-        hasOpenedAfter = true
-      }
-    }
-    // document.getElementById("box-" + ids[1]).innerText = selectedBox.value
+    openEmptyBox(boxId)
+    checkIsPlayerWin()
   }
 
   render()
+}
 
+function openEmptyBox (boxId) {
+  let hasOpenedBefore = false
+  let hasOpenedAfter = false
+  let searchIdBefore = parseInt(boxId) - 1
+  let searchIdAfter = parseInt(boxId) + 1
+  while(!hasOpenedBefore) {
+    if (isInBoard(searchIdBefore) && !isBomb(searchIdBefore)) {
+      board[searchIdBefore].clicked = true
+      if (board[searchIdBefore].value > 0) {
+        hasOpenedBefore = true
+      }
+      searchIdBefore --
+    } else {
+      hasOpenedBefore = true
+    }
+  }
+
+  while(!hasOpenedAfter) {
+    if (isInBoard(searchIdAfter) && !isBomb(searchIdAfter)) {
+      board[searchIdAfter].clicked = true
+      if (board[searchIdAfter].value > 0) {
+        hasOpenedAfter = true
+      }
+      searchIdAfter ++
+    } else {
+      hasOpenedAfter = true
+    }
+  }
+}
+
+function checkIsPlayerWin () {
+  const isWin = board.filter(val => !val.clicked).length <= bombsLength
+  if (isWin) {
+    statusEl.innerText = "You Win!"
+    isGameOver = true
+  }
 }
 
 function isBomb (index) {
@@ -150,5 +182,21 @@ function isBomb (index) {
 }
 
 function gameOver () {
-  //game over
+  bombLocation.forEach(element => {
+    board[element].clicked = true
+  })
+  
+  isGameOver = true
+  statusEl.innerText = "GAME OVER! :("
+}
+
+function init () {
+  board = []
+  bombLocation = []
+  isGameOver = false
+  inputBoardBtn.disabled = false
+  inputBoard.value = ""
+  inputBombs.value = ""
+  boardEl.innerHTML = ""
+  statusEl.innerHTML = ""
 }
